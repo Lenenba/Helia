@@ -33,7 +33,7 @@ class PostFactory extends Factory
             'content'       => $this->faker->paragraphs(3, true),
             'cover_image'   => $coverImage,
             'type'          => $type,
-            'status'        => $this->faker->randomElement(['draft', 'published', 'archived']),
+            'status'        => $this->faker->randomElement(['draft', 'published', 'unpublished', 'archived']),
             'is_published'  => $this->faker->boolean(70),
             'published_at'  => $this->faker->optional(0.7)->dateTimeBetween('-1 year', 'now'),
             'visibility'    => $this->faker->randomElement(['public', 'private', 'members_only']),

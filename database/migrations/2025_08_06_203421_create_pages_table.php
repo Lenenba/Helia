@@ -18,6 +18,7 @@ return new class extends Migration
             $table->text('excerpt')->nullable(); // Optionnel, résumé
             $table->boolean('is_published')->default(false);
             $table->string('type')->default('page'); // Pour support post/page/custom
+            $table->string('status')->default('draft');
             $table->timestamp('published_at')->nullable();
             $table->json('settings')->nullable(); // Pour personnalisation future
             $table->foreignId('author_id')->nullable()->constrained('users')->onDelete('set null');

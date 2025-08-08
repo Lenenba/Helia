@@ -35,4 +35,21 @@ export interface User {
     updated_at: string;
 }
 
+export interface SharedData extends PageProps {
+    name: string;
+    quote: { message: string; author: string };
+    auth: Auth;
+    ziggy: Config & { location: string };
+    sidebarOpen: boolean;
+}
+
+export interface Pages {
+    id: number;
+    ref: string;
+    title: string;
+    content: string;
+    created_at: string;
+    updated_at: string;
+}
+
 export type BreadcrumbItemType = BreadcrumbItem;
