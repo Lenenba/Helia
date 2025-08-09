@@ -13,23 +13,29 @@ return new class extends Migration
     {
         Schema::create('media', function (Blueprint $table) {
             $table->id();
+            // Polymorphic relation fields
+            $table->unsignedBigInteger('mediaable_id');
+            $table->string('mediaable_type');
 
-            $table->string('type');            // image, video, file, audio, etc.
-            $table->string('disk')->default('public'); // Storage disk utilisé (public, s3, local, etc.)
-            $table->string('filename');        // Nom du fichier (ex: 32423.png)
-            $table->string('original_name');   // Nom original à l'upload (ex: photo-vacances.png)
-            $table->string('mime_type');       // ex: image/png
-            $table->unsignedBigInteger('size'); // Taille en octets
-            $table->string('path');            // Chemin complet ou relatif
-            $table->string('url')->nullable(); // URL accessible publiquement (optionnel)
-            $table->json('meta')->nullable();  // Pour stocker d'autres infos (dimensions, alt, EXIF, etc.)
-            $table->boolean('is_public')->default(true); // Fichier visible par tous ou non
+            // Allows grouping (avatar, garde, ...)
+            $table->string('collection_name');
+            $table->boolean('is_profile_picture')->default(false);
+            // File info
+            $table->string('file_name');
+            $table->string('file_path');
+            $table->string('disk')->default('public');
+            $table->string('mime_type')->nullable();
+            $table->unsignedInteger('size')->nullable(); // in bytes
 
-            // Optionnel pour les médias liés à des modèles (polymorphisme)
-            // $table->nullableMorphs('mediable');
+            // Optional JSON for extra metadata
+            $table->json('custom_properties')->nullable();
 
-            $table->softDeletes();
             $table->timestamps();
+            $table->softDeletes();
+
+            // Indexes for faster lookups
+            $table->index(['mediaable_type', 'mediaable_id']);
+            $table->index('collection_name');
         });
     }
 

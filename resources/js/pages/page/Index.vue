@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue';
 import { type BreadcrumbItem, type SharedData } from '@/types';
-import { Head, usePage } from '@inertiajs/vue3';
+import { Button } from '@/components/ui/button';
+import { Head, usePage, Link } from '@inertiajs/vue3';
 import { DollarSign, User, CreditCard, Activity } from 'lucide-vue-next';
 import { computed } from 'vue';
 import DataTable from '@/components/DataTable/data-table.vue';
@@ -60,6 +61,11 @@ const pages = computed<any>(() => {
 
                         </div>
                         <div class="flex items-center justify-end">
+                            <Link href="/pages/create">
+                            <Button class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+                                Create new page
+                            </Button>
+                            </Link>
                         </div>
                     </div>
 

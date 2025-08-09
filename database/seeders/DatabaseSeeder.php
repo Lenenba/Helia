@@ -6,6 +6,7 @@ use App\Models\Page;
 use App\Models\Post;
 use App\Models\User;
 use App\Models\Block;
+use App\Models\Media;
 use App\Models\Section;
 use Illuminate\Database\Seeder;
 
@@ -16,6 +17,22 @@ class DatabaseSeeder extends Seeder
         $user = User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
+        ]);
+
+        // Create ONE profile picture for the user
+        Media::factory()->create([
+            'mediaable_id' => $user->id,
+            'mediaable_type' => User::class,
+            'collection_name' => 'avatar',
+            'is_profile_picture' => true,
+        ]);
+
+        // Create 9 additional media files for the user (e.g., a gallery)
+        Media::factory(9)->create([
+            'mediaable_id' => $user->id,
+            'mediaable_type' => User::class,
+            'collection_name' => 'gallery',
+            'is_profile_picture' => false,
         ]);
 
         Page::factory(5)

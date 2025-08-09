@@ -25,7 +25,6 @@ class Post extends Model
         'meta',
         'tags',
         'author_id',
-        'parent_id',
     ];
 
     protected $casts = [
@@ -34,4 +33,54 @@ class Post extends Model
         'meta' => 'array', // Pour stocker les métadonnées JSON
         'tags' => 'array', // Pour stocker les tags JSON
     ];
+
+    /**
+     * Get the author of the post.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
+    public function author()
+    {
+        return $this->belongsTo(User::class, 'author_id');
+    }
+
+    /**
+     * Get the parent post of the post.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
+     */
+    public function parent()
+    {
+        return $this->belongsTo(Post::class, 'parent_id');
+    }
+
+    /**
+     * Get the sections associated with the post.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
+     */
+    public function sections()
+    {
+        return $this->belongsToMany(Section::class, 'post_section');
+    }
+
+    /**
+     * Get the pages associated with the post.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
+     */
+    public function pages()
+    {
+        return $this->belongsToMany(Page::class, 'post_page');
+    }
+
+    /**
+     * Get the blocks associated with the post.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
+     */
+    public function blocks()
+    {
+        return $this->belongsToMany(Block::class, 'post_block');
+    }
 }
