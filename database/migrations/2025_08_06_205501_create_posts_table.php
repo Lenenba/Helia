@@ -25,10 +25,24 @@ return new class extends Migration
             $table->string('visibility')->default('public');
             $table->unsignedBigInteger('views')->default(0);
             $table->json('meta')->nullable();
-            $table->json('tags')->nullable();
             $table->foreignId('author_id')->nullable()->constrained('users')->onDelete('set null');
             $table->foreignId('parent_id')->nullable()->constrained('posts')->onDelete('set null');
             $table->softDeletes();
+            $table->timestamps();
+        });
+
+        //tags
+        Schema::create('tags', function (Blueprint $table) {
+            $table->id();
+            $table->string('name')->unique();
+            $table->timestamps();
+        });
+
+        // Pivot tables for many-to-many relationships tags
+        Schema::create('post_tag', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('post_id')->constrained()->onDelete('cascade');
+            $table->foreignId('tag_id')->constrained()->onDelete('cascade');
             $table->timestamps();
         });
 
@@ -63,5 +77,7 @@ return new class extends Migration
         Schema::dropIfExists('post_section');
         Schema::dropIfExists('post_page');
         Schema::dropIfExists('post_block');
+        Schema::dropIfExists('post_tag');
+        Schema::dropIfExists('tags');
     }
 };

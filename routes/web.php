@@ -3,6 +3,7 @@
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PageController;
+use App\Http\Controllers\PostController;
 use App\Http\Controllers\MediaController;
 use App\Http\Controllers\SetAsProfilePhotoController;
 use App\Http\Controllers\DeleteProfilePhotoController;
@@ -17,8 +18,14 @@ Route::get('dashboard', function () {
 
 Route::middleware('auth')->group(
     function () {
+        // Pages management
         Route::get('pages', [PageController::class, 'index'])->name('pages.list');
         Route::get('pages/create', [PageController::class, 'create'])->name('pages.create');
+
+        // Posts management
+        Route::get('posts', [PostController::class, 'index'])->name('posts.list');
+        Route::get('posts/create', [PostController::class, 'create'])->name('posts.create');
+
         // Media management
         Route::get('media', [MediaController::class, 'index'])->name('media.list');
         Route::post('media', [MediaController::class, 'store'])->name('media.store');

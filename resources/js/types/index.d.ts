@@ -52,4 +52,13 @@ export interface Pages {
     updated_at: string;
 }
 
+export interface Posts {
+    id: number;
+    ref: string;
+    title: string;
+    content: string;
+    created_at: string;
+    updated_at: string;
+}
+
 export type BreadcrumbItemType = BreadcrumbItem;

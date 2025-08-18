@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Post extends Model
 {
@@ -33,6 +35,63 @@ class Post extends Model
         'meta' => 'array', // Pour stocker les métadonnées JSON
         'tags' => 'array', // Pour stocker les tags JSON
     ];
+
+    protected $appends = ['created_at_human', 'updated_at_human'];
+
+    // On se charge du slug ici
+    protected static function booted()
+    {
+        static::creating(function ($post) {
+            // Si aucun slug n'est fourni, créer un slug basé sur le titre
+            if (!$post->slug) {
+                $post->slug = Str::slug($post->title);
+            }
+
+            // Vérifier l'unicité du slug et le rendre unique si nécessaire
+            $post->slug = self::generateUniqueSlug($post->slug);
+        });
+    }
+
+    /**
+     * Générer un slug unique en ajoutant un suffixe si nécessaire.
+     *
+     * @param string $slug
+     * @return string
+     */
+    public static function generateUniqueSlug($slug)
+    {
+        // Vérifier si un slug existe déjà dans la table 'posts'
+        $originalSlug = $slug;
+        $counter = 1;
+
+        // Tant qu'un slug avec le même nom existe, ajouter un suffixe
+        while (self::where('slug', $slug)->exists()) {
+            $slug = $originalSlug . '-' . $counter;
+            $counter++;
+        }
+
+        return $slug;
+    }
+
+    /**
+     * Format human-readable for the 'created_at' attribute.
+     *
+     * @return \Illuminate\Database\Eloquent\Casts\Attribute
+     */
+    protected function createdAtHuman(): Attribute
+    {
+        return Attribute::get(fn() => optional($this->created_at)->diffForHumans());
+    }
+
+    /**
+     * Format human-readable for the 'updated_at' attribute.
+     *
+     * @return \Illuminate\Database\Eloquent\Casts\Attribute
+     */
+    protected function updatedAtHuman(): Attribute
+    {
+        return Attribute::get(fn() => optional($this->updated_at)->diffForHumans());
+    }
 
     /**
      * Get the author of the post.
