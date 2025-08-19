@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Tag;
 use App\Models\Page;
 use App\Models\Post;
 use App\Models\User;
@@ -19,21 +20,20 @@ class DatabaseSeeder extends Seeder
             'email' => 'test@example.com',
         ]);
 
-        // Create ONE profile picture for the user
-        Media::factory()->create([
-            'mediaable_id' => $user->id,
-            'mediaable_type' => User::class,
-            'collection_name' => 'avatar',
-            'is_profile_picture' => true,
-        ]);
+        // Create some tags
+        Tag::factory()->count(10)->create();
 
-        // Create 9 additional media files for the user (e.g., a gallery)
-        Media::factory(9)->create([
-            'mediaable_id' => $user->id,
-            'mediaable_type' => User::class,
-            'collection_name' => 'gallery',
-            'is_profile_picture' => false,
-        ]);
+        Media::factory()
+            ->avatar()
+            ->forModel($user)
+            ->create();
+
+        // 9 gallery items
+        Media::factory()
+            ->gallery()
+            ->count(9)
+            ->forModel($user)
+            ->create();
 
         Page::factory(5)
             ->create([
@@ -60,9 +60,46 @@ class DatabaseSeeder extends Seeder
                 }
             });
 
-        Post::factory(8)->create([
-            'author_id'    => $user->id,
-            'is_published' => true,
-        ]);
+        $tagIds = \App\Models\Tag::pluck('id')->all();
+        Post::factory(8)
+            ->published()
+            ->create([
+                'author_id'    => $user->id,
+                'is_published' => true,
+            ])
+            ->each(function (Post $post) use ($tagIds) {
+                if (!empty($tagIds)) {
+                    // attacher 2-3 tags au hasard existants
+                    $pick = collect($tagIds)->shuffle()->take(rand(2, 3))->all();
+                    $post->tags()->syncWithoutDetaching($pick);
+                }
+            });
+
+
+        $mediaIds = Media::query()
+            ->where('mediaable_id', $user->id)
+            ->where('collection_name', 'gallery')
+            ->pluck('id');
+
+        if ($mediaIds->count() > 0) {
+            Post::factory(3)
+                ->published()
+                ->create([
+                    'author_id' => $user->id,
+                    // on va renseigner cover_media_id après création
+                ])
+                ->each(function (Post $post) use ($mediaIds) {
+                    $post->update([
+                        'cover_media_id'   => $mediaIds->random(),
+                        'cover_image_path' => null, // pour bien tester la voie "galerie"
+                    ]);
+
+                    if (!empty($tagIds)) {
+                        // attacher 2-3 tags au hasard existants
+                        $pick = collect($tagIds)->shuffle()->take(rand(2, 3))->all();
+                        $post->tags()->syncWithoutDetaching($pick);
+                    }
+                });
+        }
     }
 }

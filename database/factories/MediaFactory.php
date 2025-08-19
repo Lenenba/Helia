@@ -2,13 +2,14 @@
 
 namespace Database\Factories;
 
-use App\Models\Media;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
+use App\Models\Media;
 use Illuminate\Support\Str;
+use App\Helpers\ImageHelper;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Media>
@@ -29,94 +30,88 @@ class MediaFactory extends Factory
      */
     public function definition(): array
     {
-        // Generate a remote URL for an image.
-        $url = $this->generateFakeProfilePhoto() ?? $this->generateFakeCompanyLogo();
+        // 1) Download or synthesize bytes
+        [$bytes, $ext, $mime] = ImageHelper::downloadOrMakeImage();
 
-        // If no URL could be generated, return an empty array to skip creation.
-        if (!$url) {
-            Log::warning('MediaFactory: Could not generate an image URL.');
-            return [];
-        }
-
-        // Derive a file name from the URL path, or generate a uuid if none.
-        $pathInfo = pathinfo(parse_url($url, PHP_URL_PATH) ?? '');
-        $fileName = isset($pathInfo['basename']) && Str::contains($pathInfo['basename'], '.')
-            ? $pathInfo['basename']
-            : (Str::uuid() . '.jpg');
-
-        // Define the storage path. e.g., 'media/random_file_name.jpg'
+        // 2) Compute unique path + file name
+        $fileName    = 'img_' . Str::uuid() . '.' . $ext;
         $storagePath = 'media/' . $fileName;
 
-        try {
-            // Get the image content from the remote URL.
-            $imageContents = Http::get($url)->body();
+        // 3) Store
+        Storage::disk('public')->put($storagePath, $bytes);
 
-            // Store the file in the public disk.
-            Storage::disk('public')->put($storagePath, $imageContents);
-        } catch (\Throwable $e) {
-            // Log the error and skip creating this media record if download/storage fails.
-            Log::error('MediaFactory: Failed to download or store image.', ['url' => $url, 'error' => $e->getMessage()]);
-            return [];
-        }
+        // 4) Derive mime/size with safe fallbacks
+        $detectedMime = Storage::disk('public')->mimeType($storagePath) ?: $mime ?: 'image/jpeg';
+        $sizeBytes    = Storage::disk('public')->size($storagePath) ?: strlen($bytes);
 
         return [
-            // Attach to a new user by default
-            'mediaable_id'   => User::factory(),
-            'mediaable_type' => User::class,
-            // Default collection; adjust via state() when needed
-            'collection_name' => 'avatar',
-            'file_name'      => $fileName,
-            // The path within the storage disk where the file is located.
-            'file_path'      => $storagePath,
-            // Use the actual mime type and size of the stored file.
-            'mime_type'      => Storage::disk('public')->mimeType($storagePath),
-            'size'           => Storage::disk('public')->size($storagePath),
-            'disk'           => 'public', // It's good practice to store the disk name.
+            // NOTE: we do NOT set mediaable_* here to let the seeder override cleanly.
+            'collection_name'    => 'avatar',
+            'file_name'          => $fileName,
+            'file_path'          => $storagePath,          // your UI uses /storage/{file_path}
+            'mime_type'          => $detectedMime,
+            'size'               => $sizeBytes,
+            'disk'               => 'public',
             'is_profile_picture' => true,
         ];
     }
 
     /**
-     * Generate a fake profile photo URL from Unsplash.
-     *
-     * @return string|null
+     * State: mark as avatar (512x512)
      */
-    private function generateFakeProfilePhoto(): ?string
+    public function avatar(): self
     {
-        if (!env('UNSPLASH_ACCESS_KEY')) {
-            return null;
-        }
-
-        try {
-            $response = Http::withHeaders([
-                'Authorization' => 'Client-ID ' . env('UNSPLASH_ACCESS_KEY'),
-            ])->get('https://api.unsplash.com/photos/random', [
-                'query'       => 'portrait',
-                'orientation' => 'squarish',
-            ]);
-
-            if ($response->successful()) {
-                return $response->json('urls.regular');
-            }
-        } catch (\Throwable $e) {
-            Log::warning('Unsplash API call failed.', ['error' => $e->getMessage()]);
-        }
-
-        return null;
+        return $this->state(fn() => [
+            'collection_name'    => 'avatar',
+            'is_profile_picture' => true,
+        ]);
     }
 
     /**
-     * Generate a fake company logo placeholder URL.
-     *
-     * @return string
+     * State: mark as gallery item
      */
-    private function generateFakeCompanyLogo(): string
+    public function gallery(): self
     {
-        $bgColor = ltrim($this->faker->hexColor(), '#');
-        $text    = strtoupper(substr($this->faker->company(), 0, 3));
-        $width   = 150;
-        $height  = 150;
+        return $this->state(fn() => [
+            'collection_name'    => 'gallery',
+            'is_profile_picture' => false,
+        ]);
+    }
 
-        return "https://via.placeholder.com/{$width}x{$height}/{$bgColor}/FFFFFF.png?text={$text}";
+    /**
+     * State: attach to a specific morph target (model instance).
+     */
+    public function forModel(object $model): self
+    {
+        return $this->state(fn() => [
+            'mediaable_id'   => $model->getKey(),
+            'mediaable_type' => get_class($model),
+        ]);
+    }
+
+    /**
+     * State: force a specific URL (bypass default URL logic).
+     */
+    public function fromUrl(string $url): self
+    {
+        return $this->state(function () use ($url) {
+            [$bytes, $ext, $mime] = $this->downloadOrMakeImage($url);
+
+            $fileName    = 'img_' . Str::uuid() . '.' . $ext;
+            $storagePath = 'media/' . $fileName;
+
+            Storage::disk('public')->put($storagePath, $bytes);
+
+            $detectedMime = Storage::disk('public')->mimeType($storagePath) ?: $mime ?: 'image/jpeg';
+            $sizeBytes    = Storage::disk('public')->size($storagePath) ?: strlen($bytes);
+
+            return [
+                'file_name' => $fileName,
+                'file_path' => $storagePath,
+                'mime_type' => $detectedMime,
+                'size'      => $sizeBytes,
+                'disk'      => 'public',
+            ];
+        });
     }
 }

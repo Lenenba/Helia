@@ -17,7 +17,13 @@ return new class extends Migration
             $table->string('slug')->unique();
             $table->string('excerpt')->nullable();
             $table->text('content');
-            $table->string('cover_image')->nullable();
+            $table->foreignId('cover_media_id')->nullable()
+                ->constrained('media')->nullOnDelete();
+
+            $table->string('cover_image_path')->nullable();
+
+            $table->enum('image_position', ['left', 'right'])->default('left');
+            $table->boolean('show_title')->default(true);
             $table->string('type')->default('post');
             $table->string('status')->default('draft');
             $table->boolean('is_published')->default(false);
@@ -29,12 +35,19 @@ return new class extends Migration
             $table->foreignId('parent_id')->nullable()->constrained('posts')->onDelete('set null');
             $table->softDeletes();
             $table->timestamps();
+
+
+            // Index utiles
+            $table->index(['status', 'visibility']);
+            $table->index(['type']);
+            $table->index(['published_at']);
         });
 
         //tags
         Schema::create('tags', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
+            $table->string('slug')->unique();
             $table->timestamps();
         });
 
@@ -44,6 +57,8 @@ return new class extends Migration
             $table->foreignId('post_id')->constrained()->onDelete('cascade');
             $table->foreignId('tag_id')->constrained()->onDelete('cascade');
             $table->timestamps();
+
+            $table->unique(['post_id', 'tag_id']);
         });
 
         Schema::create('post_section', function (Blueprint $table) {
@@ -51,6 +66,8 @@ return new class extends Migration
             $table->foreignId('post_id')->constrained()->onDelete('cascade');
             $table->foreignId('section_id')->constrained()->onDelete('cascade');
             $table->timestamps();
+
+            $table->unique(['post_id', 'section_id']);
         });
 
         Schema::create('post_page', function (Blueprint $table) {
@@ -58,6 +75,8 @@ return new class extends Migration
             $table->foreignId('post_id')->constrained()->onDelete('cascade');
             $table->foreignId('page_id')->constrained()->onDelete('cascade');
             $table->timestamps();
+
+            $table->unique(['post_id', 'page_id']);
         });
 
         Schema::create('post_block', function (Blueprint $table) {
@@ -65,6 +84,8 @@ return new class extends Migration
             $table->foreignId('post_id')->constrained()->onDelete('cascade');
             $table->foreignId('block_id')->constrained()->onDelete('cascade');
             $table->timestamps();
+
+            $table->unique(['post_id', 'block_id']);
         });
     }
 

@@ -61,4 +61,14 @@ export interface Posts {
     updated_at: string;
 }
 
+export type MediaItem = {
+    id: number;
+    file_path: string;   // ex: "images/foo.jpg"
+    file_name?: string;
+};
+
+export type TagItem = {
+    id: number;
+    name: string;
+};
 export type BreadcrumbItemType = BreadcrumbItem;

@@ -25,6 +25,7 @@ Route::middleware('auth')->group(
         // Posts management
         Route::get('posts', [PostController::class, 'index'])->name('posts.list');
         Route::get('posts/create', [PostController::class, 'create'])->name('posts.create');
+        Route::post('/posts', [PostController::class, 'store'])->name('posts.store');
 
         // Media management
         Route::get('media', [MediaController::class, 'index'])->name('media.list');

@@ -60,7 +60,7 @@ class Post extends Model
      */
     public static function generateUniqueSlug($slug)
     {
-        // Vérifier si un slug existe déjà dans la table 'posts'
+        // Vérifier si un slug existe déjà dans la table 'tags'
         $originalSlug = $slug;
         $counter = 1;
 
@@ -91,6 +91,15 @@ class Post extends Model
     protected function updatedAtHuman(): Attribute
     {
         return Attribute::get(fn() => optional($this->updated_at)->diffForHumans());
+    }
+
+    /**
+     * Relationship: many-to-many with posts.
+     */
+    public function tags()
+    {
+        return $this->belongsToMany(Tag::class, 'post_tag')
+            ->withTimestamps();
     }
 
     /**
