@@ -46,4 +46,15 @@ class Media extends Model
     {
         return $query->where('is_profile_picture', true);
     }
+
+    /**
+     * Get the URL of the media.
+     *
+     * @return string
+     */
+    public function getUrl(): string
+    {
+        // Assuming 'path' is the attribute that stores the file path in the database
+        return asset('storage/' . $this->file_path); // Adjust according to your storage setup
+    }
 }

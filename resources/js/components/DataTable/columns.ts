@@ -56,7 +56,8 @@ export const columns: ColumnDef<Pages>[] = [
             const page = row.original
 
             return h('div', { class: 'relative' }, h(DropdownAction, {
-                page,
+                item: page,
+                type: 'page',
             }))
         },
     },

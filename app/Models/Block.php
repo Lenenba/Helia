@@ -2,14 +2,15 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Block extends Model
 {
     /** @use HasFactory<\Database\Factories\BlockFactory> */
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     // Attributs ajoutés à la réponse de l'API ou des données renvoyées
     protected $appends = ['created_at_human', 'updated_at_human'];

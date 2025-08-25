@@ -32,8 +32,7 @@ class PostFactory extends Factory
             'content'          => $this->faker->paragraphs(3, true),
 
             // New cover fields
-            'cover_media_id'   => null,          // reserved if you use a Media model
-            'cover_image_path' => $coverImage,   // URL returned from helper
+            'cover_media_id'   => null,
 
             'image_position'   => $this->faker->randomElement(['left', 'right']),
             'show_title'       => $this->faker->boolean(85),

@@ -4,19 +4,25 @@ namespace App\Models;
 
 use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+
 
 class Post extends Model
 {
     /** @use HasFactory<\Database\Factories\PostFactory> */
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'title',
         'slug',
         'excerpt',
         'content',
+        'cover_media_id',
+        'image_position',
+        'show_title',
         'cover_image',
         'type',
         'status',
@@ -36,7 +42,11 @@ class Post extends Model
         'tags' => 'array', // Pour stocker les tags JSON
     ];
 
-    protected $appends = ['created_at_human', 'updated_at_human'];
+    protected $appends = [
+        'created_at_human',
+        'updated_at_human',
+        'cover_url'
+    ];
 
     // On se charge du slug ici
     protected static function booted()
@@ -150,5 +160,29 @@ class Post extends Model
     public function blocks()
     {
         return $this->belongsToMany(Block::class, 'post_block');
+    }
+
+    /**
+     * Get the cover image associated with the post.
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\MorphOne
+     */
+    public function coverImage(): MorphOne
+    {
+        return $this->morphOne(Media::class, 'mediaable');
+    }
+
+    /**
+     * Get the URL of the cover image.
+     *
+     * @return \Illuminate\Database\Eloquent\Casts\Attribute
+     */
+    public function coverUrl(): Attribute
+    {
+        $post_cover = Media::find($this->cover_media_id)->getUrl();
+        // Utilise la nouvelle syntaxe pour les accesseurs
+        return Attribute::get(
+            fn() => $post_cover
+        );
     }
 }

@@ -72,3 +72,21 @@ export type TagItem = {
     name: string;
 };
 export type BreadcrumbItemType = BreadcrumbItem;
+
+export interface Block {
+    id: string;
+    contentType: 'posts' | 'medias' | 'custom_html';
+    data: Record<string, any>;
+}
+
+export interface Column {
+    id: string;
+    blocks: Block[];
+}
+
+export interface Section {
+    id: string;
+    title: string;
+    type: '1 column' | '2 columns' | '3 columns' | '4 columns';
+    columns: Column[];
+}

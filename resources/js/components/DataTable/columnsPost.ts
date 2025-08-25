@@ -64,7 +64,8 @@ export const columnsPost: ColumnDef<Posts>[] = [
             const post = row.original
 
             return h('div', { class: 'relative' }, h(DropdownAction, {
-                post,
+                item: post,
+                type: 'post',
             }))
         },
     },

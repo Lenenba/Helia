@@ -11,6 +11,7 @@ type TagItem = { id: number; name: string };
 
 const props = defineProps<{
     existingTags: TagItem[]
+    selectedTagIds?: number[]
 }>();
 
 const emit = defineEmits<{
@@ -19,7 +20,7 @@ const emit = defineEmits<{
 
 const tagPopoverOpen = ref(false);
 const tagQuery = ref('');
-const selected_tag_ids = ref<number[]>([]);
+const selected_tag_ids = ref<number[]>(props.selectedTagIds ?? []);
 const new_tags = ref<string[]>([]);
 
 const allExisting = computed(() => props.existingTags ?? []);

@@ -60,21 +60,7 @@ class DatabaseSeeder extends Seeder
                 }
             });
 
-        $tagIds = \App\Models\Tag::pluck('id')->all();
-        Post::factory(8)
-            ->published()
-            ->create([
-                'author_id'    => $user->id,
-                'is_published' => true,
-            ])
-            ->each(function (Post $post) use ($tagIds) {
-                if (!empty($tagIds)) {
-                    // attacher 2-3 tags au hasard existants
-                    $pick = collect($tagIds)->shuffle()->take(rand(2, 3))->all();
-                    $post->tags()->syncWithoutDetaching($pick);
-                }
-            });
-
+        $tagIds = Tag::pluck('id')->all();
 
         $mediaIds = Media::query()
             ->where('mediaable_id', $user->id)
@@ -82,16 +68,15 @@ class DatabaseSeeder extends Seeder
             ->pluck('id');
 
         if ($mediaIds->count() > 0) {
-            Post::factory(3)
+            Post::factory(12)
                 ->published()
                 ->create([
                     'author_id' => $user->id,
                     // on va renseigner cover_media_id après création
                 ])
-                ->each(function (Post $post) use ($mediaIds) {
+                ->each(function (Post $post) use ($mediaIds, $tagIds) {
                     $post->update([
                         'cover_media_id'   => $mediaIds->random(),
-                        'cover_image_path' => null, // pour bien tester la voie "galerie"
                     ]);
 
                     if (!empty($tagIds)) {

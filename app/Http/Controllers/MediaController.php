@@ -21,7 +21,7 @@ class MediaController extends Controller
     {
         $user = Auth::user();
         /** @var \App\Models\Media $user */
-        $media = $user->media()
+        $media = Media::query()
             ->orderByDesc('created_at')
             ->get()
             ->map(fn(Media $item) => [

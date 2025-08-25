@@ -2,67 +2,89 @@
 import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem, type SharedData } from '@/types'
 import { Head, usePage } from '@inertiajs/vue3'
-import { computed, reactive } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import SectionManager from './Components/SectionManager.vue'
+import PreviewBlock from './Components/PreviewBlock.vue'
+
 // UI kit
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import { Button } from '@/components/ui/button'
 
-// --- INTERFACES MISES À JOUR ---
+interface Block { id: string; contentId: number; contentType: 'post' | 'media' | 'block'; title: string }
+interface Column { id: string; blocks: Block[] }
+interface Section { id: string; title: string; type: '1 column' | '2 columns' | '3 columns' | '4 columns'; columns: Column[] }
 
-// MODIFIÉ: Le bloc contient maintenant des informations sur le contenu lié.
-interface Block {
-    id: string; // ID unique du bloc dans la section
-    contentId: number; // ID du Post ou autre contenu source
-    contentType: 'post' | 'block'; // Type de contenu pour le backend
-    title: string; // Titre du contenu pour l'affichage dans l'éditeur
-}
-
-interface Column {
-    id: string;
-    blocks: Block[];
-}
-
-interface Section {
-    id: string;
-    title: string;
-    type: '1 column' | '2 columns' | '3 columns' | '4 columns';
-    columns: Column[];
-}
-
-// Breadcrumbs
-const breadcrumbs: BreadcrumbItem[] = [{ title: 'Page creation', href: '/pages/create' }];
-
-// Props & Formulaire principal
+const breadcrumbs: BreadcrumbItem[] = [{ title: 'Page creation', href: '/pages/create' }]
 const page = usePage<SharedData>()
-const form = reactive({
-    title: '',
-    slug: '',
-    type: 'page',
-    status: 'draft',
-    parent_id: undefined as number | undefined,
-    sections: [] as Section[],
-});
+const form = reactive({ title: '', slug: '', type: 'page', status: 'draft', parent_id: undefined as number | undefined, sections: [] as Section[] })
 const availableElements = computed(() => page.props.availableElements)
 
-const addSection = (newSection: Section) => {
-    form.sections.push(newSection)
+const addSection = (s: Section) => form.sections.push(s)
+const removeSection = (id: string) => (form.sections = form.sections.filter(sec => sec.id !== id))
+
+const postsById = computed<Record<number, any>>(() => Object.fromEntries((availableElements.value?.posts ?? []).map(p => [Number(p.id), p])))
+const blocksById = computed<Record<number, any>>(() => Object.fromEntries((availableElements.value?.blocks ?? []).map(b => [Number(b.id), b])))
+const mediasById = computed<Record<number, any>>(() => Object.fromEntries((availableElements.value?.medias ?? []).map(m => [Number(m.id), m])))
+
+/** Normalizes backend data to PreviewBlock payloads */
+function resolveBlockPayload(b: Block) {
+    if (b.contentType === 'media') {
+        const m = mediasById.value[b.contentId]
+        const url = m?.url ?? m?.src ?? (m?.path ? `/storage/${m.path}` : undefined)
+        return { kind: 'media', url, mime: m?.mime, title: m?.title ?? m?.filename ?? '' }
+    }
+    if (b.contentType === 'post') {
+        const p = postsById.value[b.contentId]
+        const imageUrl = p?.cover_url ?? p?.image ?? p?.hero_image ?? undefined
+        const imagePosition = (p?.image_position ?? 'top') as 'top' | 'left' | 'right' | 'background' | 'none'
+        return {
+            kind: 'post',
+            title: p?.title ?? b.title ?? 'Untitled post',
+            excerpt: p?.excerpt ?? p?.summary ?? '',
+            bodyHtml: p?.body ?? p?.content ?? undefined,
+            imageUrl,
+            imagePosition,
+            raw: p,
+        }
+    }
+    const blk = blocksById.value[b.contentId]
+    return {
+        kind: 'generic',
+        title: blk?.title ?? b.title ?? 'Untitled block',
+        excerpt: blk?.excerpt ?? '',
+        image: blk?.image ?? blk?.cover ?? undefined,
+        html: blk?.html ?? blk?.content ?? undefined,
+        raw: blk,
+    }
 }
 
-const removeSection = (id: string) => {
-    form.sections = form.sections.filter(s => s.id !== id)
+function sectionGridCols(type: Section['type']) {
+    switch (type) {
+        case '1 column': return 'grid-cols-1'
+        case '2 columns': return 'grid-cols-1 md:grid-cols-2'
+        case '3 columns': return 'grid-cols-1 md:grid-cols-3'
+        case '4 columns': return 'grid-cols-1 md:grid-cols-4'
+    }
 }
+
+type PreviewMode = 'desktop' | 'tablet' | 'mobile'
+const previewMode = ref<PreviewMode>('desktop')
+const previewWidthClass = computed(() => previewMode.value === 'mobile' ? 'max-w-[380px] w-full' : previewMode.value === 'tablet' ? 'max-w-[820px] w-full' : 'max-w-[1200px] w-full')
+const previewPageTitle = computed(() => form.title?.trim() || 'Untitled page')
 </script>
 
 <template>
 
     <Head title="page" />
+
     <AppLayout :breadcrumbs="breadcrumbs">
         <div class="p-4">
             <div class="grid grid-cols-1 gap-4 md:grid-cols-[1fr_1.5fr]">
+                <!-- LEFT: Editor -->
                 <Card class="rounded-md">
                     <CardHeader>
                         <CardTitle>Form</CardTitle>
@@ -72,12 +94,11 @@ const removeSection = (id: string) => {
                             <Label for="title">Title</Label>
                             <Input id="title" v-model="form.title" placeholder="e.g. About us" class="w-full" />
                         </div>
-                        <!-- Use a 3-col grid on md+, each child forced to w-full to avoid shrinking -->
+
                         <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
                             <div class="space-y-2 w-full">
                                 <Label>Type</Label>
                                 <Select v-model="form.type">
-                                    <!-- Force the trigger to fill its grid cell -->
                                     <SelectTrigger class="w-full">
                                         <SelectValue placeholder="Select type" />
                                     </SelectTrigger>
@@ -94,7 +115,6 @@ const removeSection = (id: string) => {
                             <div class="space-y-2 w-full">
                                 <Label>Status</Label>
                                 <Select v-model="form.status">
-                                    <!-- Force the trigger to fill its grid cell -->
                                     <SelectTrigger class="w-full">
                                         <SelectValue placeholder="Select status" />
                                     </SelectTrigger>
@@ -111,21 +131,19 @@ const removeSection = (id: string) => {
                             <div class="space-y-2 w-full">
                                 <Label>Parent page</Label>
                                 <Select v-model="form.parent_id">
-                                    <!-- Force the trigger to fill its grid cell -->
                                     <SelectTrigger class="w-full">
                                         <SelectValue placeholder="None" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectGroup>
                                             <SelectItem v-for="p in availableElements.pages" :key="p.id" :value="p.id">
-                                                {{ p.title }}
-                                            </SelectItem>
+                                                {{ p.title }}</SelectItem>
                                         </SelectGroup>
                                     </SelectContent>
                                 </Select>
                             </div>
                         </div>
-                        <!-- Sections -->
+
                         <Separator />
 
                         <div class="space-y-3">
@@ -135,7 +153,70 @@ const removeSection = (id: string) => {
                     </CardContent>
                 </Card>
 
+                <!-- RIGHT: Live Preview -->
                 <Card class="rounded-md">
+                    <CardHeader class="pb-3">
+                        <div class="flex items-center justify-between">
+                            <CardTitle>Live preview</CardTitle>
+                            <div class="inline-flex gap-2">
+                                <Button size="sm" variant="outline"
+                                    :class="previewMode === 'desktop' ? 'ring-2 ring-ring' : ''"
+                                    @click="previewMode = 'desktop'">Desktop</Button>
+                                <Button size="sm" variant="outline"
+                                    :class="previewMode === 'tablet' ? 'ring-2 ring-ring' : ''"
+                                    @click="previewMode = 'tablet'">Tablet</Button>
+                                <Button size="sm" variant="outline"
+                                    :class="previewMode === 'mobile' ? 'ring-2 ring-ring' : ''"
+                                    @click="previewMode = 'mobile'">Mobile</Button>
+                            </div>
+                        </div>
+                    </CardHeader>
+
+                    <CardContent>
+                        <div class="w-full flex justify-center">
+                            <div class="border rounded-lg overflow-hidden bg-background shadow-sm"
+                                :class="previewWidthClass">
+                                <!-- Fake header -->
+                                <div class="px-5 py-4 border-b bg-muted/40">
+                                    <div class="flex items-center justify-between">
+                                        <div class="font-semibold truncate">{{ previewPageTitle }}</div>
+                                        <div class="text-xs text-muted-foreground">Preview</div>
+                                    </div>
+                                </div>
+
+                                <!-- Content -->
+                                <div class="p-5 space-y-8">
+                                    <div v-if="!form.sections.length"
+                                        class="text-sm text-muted-foreground text-center py-10">
+                                        No sections yet. Use the editor to add a section and you will see it live here.
+                                    </div>
+
+                                    <section v-for="section in form.sections" :key="section.id" class="space-y-4">
+                                        <h2 class="text-lg font-semibold tracking-tight">{{ section.title ||
+                                            'Untitled_section' }}</h2>
+
+                                        <!-- Equal-height rows + stretched items -->
+                                        <div class="grid gap-4 items-stretch auto-rows-fr"
+                                            :class="sectionGridCols(section.type)">
+                                            <div v-for="col in section.columns" :key="col.id" class="space-y-4">
+                                                <article v-for="blk in col.blocks" :key="blk.id"
+                                                    class="rounded-lg border bg-card text-card-foreground overflow-hidden h-full flex flex-col">
+                                                    <PreviewBlock :block="blk" :resolveBlock="resolveBlockPayload"
+                                                        :allowHtml="true" :uniform="section.type !== '1 column'"
+                                                        uniformImageHeightClass="h-48 md:h-56" />
+                                                </article>
+                                            </div>
+                                        </div>
+                                    </section>
+                                </div>
+
+                                <!-- Fake footer -->
+                                <div class="px-5 py-4 border-t bg-muted/30 text-xs text-muted-foreground">
+                                    © Preview
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
                 </Card>
             </div>
         </div>

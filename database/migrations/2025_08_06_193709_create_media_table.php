@@ -26,6 +26,7 @@ return new class extends Migration
             $table->string('disk')->default('public');
             $table->string('mime_type')->nullable();
             $table->unsignedInteger('size')->nullable(); // in bytes
+            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
 
             // Optional JSON for extra metadata
             $table->json('custom_properties')->nullable();

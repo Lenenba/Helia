@@ -19,9 +19,6 @@ return new class extends Migration
             $table->text('content');
             $table->foreignId('cover_media_id')->nullable()
                 ->constrained('media')->nullOnDelete();
-
-            $table->string('cover_image_path')->nullable();
-
             $table->enum('image_position', ['left', 'right'])->default('left');
             $table->boolean('show_title')->default(true);
             $table->string('type')->default('post');

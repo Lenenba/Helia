@@ -6,20 +6,24 @@ use App\Models\Tag;
 use App\Models\Post;
 use Inertia\Inertia;
 use App\Models\Media;
+use Inertia\Response;
 use App\Http\Requests\PostRequest;
 use App\Services\ModelStatsService;
+use Illuminate\Http\RedirectResponse;
+use App\Services\PostService; // Importer le service
 
 class PostController extends Controller
 {
     /**
      * Display a list of posts with stats.
      * @param ModelStatsService $statsService
-     * @return \Inertia\Response
+     * @return Response
+     * Note: This method uses the ModelStatsService to compute statistics
      */
-    public function index(ModelStatsService $statsService)
+    public function index(ModelStatsService $statsService): Response
     {
-        $posts = Post::all();
-
+        // Amélioration : Utiliser latest() et with() pour éviter le problème N+1
+        $posts = Post::latest()->with('coverImage', 'author')->get();
         $stats = $statsService->compute($posts, 'type');
 
         return Inertia::render('post/Index', [
@@ -30,68 +34,71 @@ class PostController extends Controller
 
     /**
      * Show the form to create a new post.
-     * @return \Inertia\Response
+     * @return Response
+     *
+     * Note: This method loads media and tags to populate the form fields.
+     * It uses Inertia to render the Vue component for the post creation form.
      */
-    public function create()
+    public function create(): Response
     {
-        $media = Media::all();
-        $tags = Tag::all();
-        return Inertia::render(
-            'post/Create',
-            [
-                'media' => $media,
-                'tags' => $tags,
-            ]
-        );
+        return Inertia::render('post/Create', [
+            // Amélioration : Ne sélectionner que les colonnes nécessaires
+            'media' => Media::select('id', 'file_path', 'file_name')->get(),
+            'tags'  => Tag::select('id', 'name')->get(),
+        ]);
     }
 
     /**
      * Store a new post.
      * @param PostRequest $request
-     * @return \Illuminate\Http\RedirectResponse
+     * @param PostService $postService
+     * @return RedirectResponse
+     *
+     * Note: This method uses the PostService to handle the save logic, ensuring
+     * that the post is created with all necessary relationships and validations.
      */
-    public function store(PostRequest $request)
+    public function store(PostRequest $request, PostService $postService): RedirectResponse
     {
-        $data = $request->validated();
+        $postService->savePost($request);
 
-        // Gérer l’image
-        $cover_media_id = null;
-        $cover_image_path = null;
+        return redirect()->route('posts.list')->with('success', 'Post created successfully.');
+    }
 
-        if (!empty($data['cover_image_id'])) {
-            $cover_media_id = $data['cover_image_id'];
-        } elseif ($request->hasFile('cover_image_file')) {
-            $path = $request->file('cover_image_file')->store('covers', 'public');
-            $cover_image_path = $path;
-        }
+    /**
+     * Show the form for editing the specified post.
+     *
+     * @param Post $post
+     * @return Response
+     *
+     * Note: This method loads the post with its tags and cover image to ensure
+     * that the form can be pre-populated with existing data.
+     */
+    public function edit(Post $post): Response
+    {
+        $post->load(['tags', 'coverImage', 'author']);
 
-        $post = Post::create([
-            'title'          => $data['title'],
-            'content'        => $data['content'],
-            'cover_media_id' => $cover_media_id,
-            'cover_image_path' => $cover_image_path,
-            'image_position' => $data['image_position'],
-            'show_title'     => true,
-            'type'           => $data['type'],
-            'status'         => $data['status'],
-            'author_id'      => auth()->id(),
+        return Inertia::render('post/Edit', [
+            'post'  => $post,
+            'media' => Media::select('id', 'file_path', 'file_name')->get(),
+            'tags'  => Tag::select('id', 'name')->get(),
         ]);
+    }
 
-        // Créer les tags “new_tags”
-        $createdTagIds = [];
-        foreach ($data['new_tags'] ?? [] as $name) {
-            $name = trim($name);
-            if ($name === '') continue;
-            $tag = Tag::firstOrCreate(['name' => $name]);
-            $createdTagIds[] = $tag->id;
-        }
+    /**
+     * Update the specified post in storage.
+     *
+     * @param PostRequest $request
+     * @param Post $post
+     * @param PostService $postService
+     * @return RedirectResponse
+     *
+     * Note: This method uses the PostService to handle the save logic, ensuring
+     * that the post is either created or updated based on whether $post is null.
+     */
+    public function update(PostRequest $request, Post $post, PostService $postService): RedirectResponse
+    {
+        $postService->savePost($request, $post);
 
-        // Attacher tags (existants + créés)
-        $tagIds = array_unique(array_merge($data['selected_tag_ids'] ?? [], $createdTagIds));
-        if (!empty($tagIds)) {
-            $post->tags()->sync($tagIds);
-        }
-
-        return redirect()->route('posts.list', $post)->with('success', 'Post created');
+        return redirect()->route('posts.list')->with('success', 'Post updated successfully.');
     }
 }

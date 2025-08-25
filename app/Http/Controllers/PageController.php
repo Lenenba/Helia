@@ -37,32 +37,55 @@ class PageController extends Controller
      */
     public function create()
     {
-        // Define which models to fetch and which column to use for the display label.
+        // Configuration enrichie avec des 'mappers' pour une transformation sur mesure.
         $elementConfig = [
-            'posts' => ['model' => Post::class, 'label_column' => 'title'],
-            'pages' => ['model' => Page::class, 'label_column' => 'title'],
-            'blocks' => ['model' => Block::class, 'label_column' => 'name'], // Adjust 'name' if your column is different
-            'medias' => ['model' => Media::class, 'label_column' => 'file_name'],
+            'posts' => [
+                'model' => Post::class,
+                // Le mapper transforme chaque modèle Post en tableau avec la structure désirée.
+                'mapper' => function (Post $post) {
+                    return [
+                        'id' => $post->id,
+                        'title' => $post->title,
+                        'label' => $post->title,
+                        'excerpt' => $post->excerpt,
+                        'body' => $post->content,
+                        'cover_url' => $post->coverUrl,
+                        'image_position' => $post->image_position ?? 'left',
+                        'type' => 'post',
+                    ];
+                }
+            ],
+            'medias' => [
+                'model' => Media::class,
+                // HYPOTHÈSE: Vous utilisez la librairie Spatie\MediaLibrary
+                // qui fournit des méthodes pratiques comme getUrl().
+                'mapper' => function (Media $media) {
+                    return [
+                        'id' => $media->id,
+                        'url' => $media->getUrl(), // Obtenir l'URL publique du média
+                        'title' => $media->file_name,   // Le nom donné au média
+                        'label' => $media->file_name,   // Le nom donné au média
+                        'mime' => $media->mime_type,
+                        'type' => 'media',
+                    ];
+                }
+            ],
         ];
 
         $availableElements = [];
 
-        // Loop through the configuration to build standardized lists.
+        // La boucle est maintenant plus simple et plus puissante.
         foreach ($elementConfig as $key => $config) {
             $modelClass = $config['model'];
-            $labelColumn = $config['label_column'];
-            $type = Str::singular($key); // e.g., 'posts' becomes 'post'
+            $mapper = $config['mapper'];
 
-            $availableElements[$key] = $modelClass::query()
-                // 1. Select only the ID and the label column for efficiency.
-                ->select('id', "{$labelColumn} as label")
-                ->get()
-                // 2. Map the results to a standard format.
-                ->map(fn($item) => [
-                    'id' => $item->id,
-                    'label' => $item->label,
-                    'type' => $type,
-                ]);
+            // 1. On récupère les modèles complets, sans `select()`.
+            //    Ceci est nécessaire pour pouvoir utiliser les accesseurs
+            //    (ex: getUrl()) et avoir toutes les données dans le mapper.
+            $items = $modelClass::query()->latest()->get();
+
+            // 2. On applique la transformation sur mesure définie dans le mapper.
+            $availableElements[$key] = $items->map($mapper);
         }
 
         return Inertia::render('page/Create', [

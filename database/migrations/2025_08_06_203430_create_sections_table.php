@@ -15,7 +15,8 @@ return new class extends Migration
             $table->id();
             $table->string('title')->nullable();
             $table->boolean('is_published')->default(false);
-            $table->text('type')->default('1 column');
+            $table->enum('type', ['one_column', 'two_columns', 'hero', 'gallery'])
+                ->default('one_column');
             $table->string('color')->default('#ffffff');
             $table->unsignedInteger('order')->default(0); // Correction ici
             $table->string('slug')->nullable(); // Optionnel, pour URLs propres
