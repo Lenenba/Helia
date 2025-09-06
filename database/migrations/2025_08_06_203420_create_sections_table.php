@@ -14,19 +14,14 @@ return new class extends Migration
         Schema::create('sections', function (Blueprint $table) {
             $table->id();
             $table->string('title')->nullable();
-            $table->boolean('is_published')->default(false);
-            $table->enum('type', ['one_column', 'two_columns', 'hero', 'gallery'])
+            $table->boolean('is_published')->default(false); // Peut être gardé pour un contrôle global
+            $table->enum('type', ['one_column', 'two_columns', 'tree_columns', 'for_columns', 'hero', 'gallery'])
                 ->default('one_column');
             $table->string('color')->default('#ffffff');
-            $table->unsignedInteger('order')->default(0); // Correction ici
-            $table->string('slug')->nullable(); // Optionnel, pour URLs propres
-            $table->json('settings')->nullable(); // Optionnel, flexibilité
-            $table->foreignId('page_id')->constrained('pages')->onDelete('cascade');
+            $table->string('slug')->nullable()->unique();
+            $table->json('settings')->nullable();
             $table->softDeletes();
             $table->timestamps();
-
-            // Pour garantir que chaque section d'une page a un order unique
-            $table->unique(['page_id', 'order']);
         });
     }
 

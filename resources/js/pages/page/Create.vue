@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue'
 import { type BreadcrumbItem, type SharedData } from '@/types'
-import { Head, usePage } from '@inertiajs/vue3'
+import { Head, usePage, router } from '@inertiajs/vue3'
 import { computed, reactive, ref } from 'vue'
+
 import SectionManager from './Components/SectionManager.vue'
 import PreviewBlock from './Components/PreviewBlock.vue'
 
@@ -14,23 +15,62 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 
-interface Block { id: string; contentId: number; contentType: 'post' | 'media' | 'block'; title: string }
-interface Column { id: string; blocks: Block[] }
-interface Section { id: string; title: string; type: '1 column' | '2 columns' | '3 columns' | '4 columns'; columns: Column[] }
+/* -------------------------------------------
+   TYPES USED BY THE EDITOR
+------------------------------------------- */
+interface Block {
+    id: string
+    contentId: number
+    contentType: 'post' | 'media' | 'block'
+    title: string
+}
+interface Column {
+    id: string
+    blocks: Block[]
+}
+interface Section {
+    id: string
+    title: string
+    type: '1 column' | '2 columns' | '3 columns' | '4 columns'
+    columns: Column[]
+}
 
+/* -------------------------------------------
+   FORM STATE
+------------------------------------------- */
 const breadcrumbs: BreadcrumbItem[] = [{ title: 'Page creation', href: '/pages/create' }]
 const page = usePage<SharedData>()
-const form = reactive({ title: '', slug: '', type: 'page', status: 'draft', parent_id: undefined as number | undefined, sections: [] as Section[] })
+
+const form = reactive({
+    title: '',
+    slug: '',
+    type: 'page',
+    status: 'draft',
+    parent_id: undefined as number | undefined,
+    sections: [] as Section[],
+})
+const isSaving = ref(false)
+
 const availableElements = computed(() => page.props.availableElements)
 
+/** add/remove sections from the left editor */
 const addSection = (s: Section) => form.sections.push(s)
 const removeSection = (id: string) => (form.sections = form.sections.filter(sec => sec.id !== id))
 
-const postsById = computed<Record<number, any>>(() => Object.fromEntries((availableElements.value?.posts ?? []).map(p => [Number(p.id), p])))
-const blocksById = computed<Record<number, any>>(() => Object.fromEntries((availableElements.value?.blocks ?? []).map(b => [Number(b.id), b])))
-const mediasById = computed<Record<number, any>>(() => Object.fromEntries((availableElements.value?.medias ?? []).map(m => [Number(m.id), m])))
+/* -------------------------------------------
+   LOOKUPS FOR PREVIEW (posts, blocks, medias)
+------------------------------------------- */
+const postsById = computed<Record<number, any>>(
+    () => Object.fromEntries((availableElements.value?.posts ?? []).map(p => [Number(p.id), p]))
+)
+const blocksById = computed<Record<number, any>>(
+    () => Object.fromEntries((availableElements.value?.blocks ?? []).map(b => [Number(b.id), b]))
+)
+const mediasById = computed<Record<number, any>>(
+    () => Object.fromEntries((availableElements.value?.medias ?? []).map(m => [Number(m.id), m]))
+)
 
-/** Normalizes backend data to PreviewBlock payloads */
+/** Normalize backend shapes to what PreviewBlock expects */
 function resolveBlockPayload(b: Block) {
     if (b.contentType === 'media') {
         const m = mediasById.value[b.contentId]
@@ -45,7 +85,7 @@ function resolveBlockPayload(b: Block) {
             kind: 'post',
             title: p?.title ?? b.title ?? 'Untitled post',
             excerpt: p?.excerpt ?? p?.summary ?? '',
-            bodyHtml: p?.body ?? p?.content ?? undefined,
+            bodyHtml: p?.body ?? p?.content ?? undefined, // ONLY render if sanitized (we enable in preview)
             imageUrl,
             imagePosition,
             raw: p,
@@ -62,6 +102,9 @@ function resolveBlockPayload(b: Block) {
     }
 }
 
+/* -------------------------------------------
+   SECTION GRID MAPPING (UI)
+------------------------------------------- */
 function sectionGridCols(type: Section['type']) {
     switch (type) {
         case '1 column': return 'grid-cols-1'
@@ -71,10 +114,80 @@ function sectionGridCols(type: Section['type']) {
     }
 }
 
+/* -------------------------------------------
+   DEVICE PREVIEW
+------------------------------------------- */
 type PreviewMode = 'desktop' | 'tablet' | 'mobile'
 const previewMode = ref<PreviewMode>('desktop')
-const previewWidthClass = computed(() => previewMode.value === 'mobile' ? 'max-w-[380px] w-full' : previewMode.value === 'tablet' ? 'max-w-[820px] w-full' : 'max-w-[1200px] w-full')
+const previewWidthClass = computed(() =>
+    previewMode.value === 'mobile' ? 'max-w-[380px] w-full'
+        : previewMode.value === 'tablet' ? 'max-w-[820px] w-full'
+            : 'max-w-[1200px] w-full'
+)
 const previewPageTitle = computed(() => form.title?.trim() || 'Untitled page')
+
+/* -------------------------------------------
+   SUBMIT HANDLER
+   - Transforms editor state to a backend-friendly payload.
+------------------------------------------- */
+function mapUiTypeToDbEnum(type: Section['type']): 'one_column' | 'two_columns' | 'hero' | 'gallery' {
+    // We only send this as hint; backend also re-maps safely.
+    switch (type) {
+        case '1 column': return 'one_column'
+        case '2 columns': return 'two_columns'
+        case '3 columns': return 'gallery'
+        case '4 columns': return 'gallery'
+    }
+}
+
+function buildPayloadForStore() {
+    // Flatten the editor model into a compact payload.
+    return {
+        title: form.title,
+        slug: form.slug || null,
+        type: form.type,
+        status: form.status,
+        parent_id: form.parent_id ?? null,
+        // sections array with per-section columns + blocks
+        sections: form.sections.map((s, sIdx) => ({
+            title: s.title,
+            ui_type: s.type,             // keep the UI label (backend maps)
+            db_type_hint: mapUiTypeToDbEnum(s.type),
+            order: sIdx,
+            color: '#ffffff',
+            // include layout info so backend can store it in sections.settings
+            layout: {
+                columns_count: s.columns.length,
+                columns: s.columns.map((c, cIdx) => ({
+                    index: cIdx,
+                    blocks: c.blocks.map((b, bIdx) => ({
+                        id: b.id,
+                        contentId: b.contentId,
+                        contentType: b.contentType,
+                        title: b.title ?? null,
+                        order: bIdx,
+                    })),
+                })),
+            },
+        })),
+    }
+}
+
+async function submitForm() {
+    // Basic guard
+    if (!form.title?.trim()) {
+        alert('Title is required.')
+        return
+    }
+
+    isSaving.value = true
+    const payload = buildPayloadForStore()
+
+    router.post(route('pages.store'), payload, {
+        preserveScroll: true,
+        onFinish: () => { isSaving.value = false },
+    })
+}
 </script>
 
 <template>
@@ -82,7 +195,7 @@ const previewPageTitle = computed(() => form.title?.trim() || 'Untitled page')
     <Head title="page" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="p-4">
+        <form class="p-4" @submit.prevent="submitForm">
             <div class="grid grid-cols-1 gap-4 md:grid-cols-[1fr_1.5fr]">
                 <!-- LEFT: Editor -->
                 <Card class="rounded-md">
@@ -150,6 +263,13 @@ const previewPageTitle = computed(() => form.title?.trim() || 'Untitled page')
                             <SectionManager :sections="form.sections" :availableElements="availableElements"
                                 @addSection="addSection" @removeSection="removeSection" />
                         </div>
+
+                        <div class="flex justify-end pt-4">
+                            <Button type="submit" :disabled="isSaving">
+                                <span v-if="isSaving">Saving…</span>
+                                <span v-else>Save Page</span>
+                            </Button>
+                        </div>
                     </CardContent>
                 </Card>
 
@@ -176,7 +296,6 @@ const previewPageTitle = computed(() => form.title?.trim() || 'Untitled page')
                         <div class="w-full flex justify-center">
                             <div class="border rounded-lg overflow-hidden bg-background shadow-sm"
                                 :class="previewWidthClass">
-                                <!-- Fake header -->
                                 <div class="px-5 py-4 border-b bg-muted/40">
                                     <div class="flex items-center justify-between">
                                         <div class="font-semibold truncate">{{ previewPageTitle }}</div>
@@ -184,7 +303,6 @@ const previewPageTitle = computed(() => form.title?.trim() || 'Untitled page')
                                     </div>
                                 </div>
 
-                                <!-- Content -->
                                 <div class="p-5 space-y-8">
                                     <div v-if="!form.sections.length"
                                         class="text-sm text-muted-foreground text-center py-10">
@@ -193,7 +311,7 @@ const previewPageTitle = computed(() => form.title?.trim() || 'Untitled page')
 
                                     <section v-for="section in form.sections" :key="section.id" class="space-y-4">
                                         <h2 class="text-lg font-semibold tracking-tight">{{ section.title ||
-                                            'Untitled_section' }}</h2>
+                                            'Untitled section' }}</h2>
 
                                         <!-- Equal-height rows + stretched items -->
                                         <div class="grid gap-4 items-stretch auto-rows-fr"
@@ -210,7 +328,6 @@ const previewPageTitle = computed(() => form.title?.trim() || 'Untitled page')
                                     </section>
                                 </div>
 
-                                <!-- Fake footer -->
                                 <div class="px-5 py-4 border-t bg-muted/30 text-xs text-muted-foreground">
                                     © Preview
                                 </div>
@@ -219,6 +336,6 @@ const previewPageTitle = computed(() => form.title?.trim() || 'Untitled page')
                     </CardContent>
                 </Card>
             </div>
-        </div>
+        </form>
     </AppLayout>
 </template>

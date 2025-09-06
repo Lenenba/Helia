@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 
 class Post extends Model
@@ -103,12 +104,31 @@ class Post extends Model
         return Attribute::get(fn() => optional($this->updated_at)->diffForHumans());
     }
 
-    /**
-     * Relationship: many-to-many with posts.
-     */
-    public function tags()
+    /** Many-to-Many: Tags */
+    public function tags(): BelongsToMany
     {
         return $this->belongsToMany(Tag::class, 'post_tag')
+            ->withTimestamps();
+    }
+
+    /** Many-to-Many: Sections */
+    public function sections(): BelongsToMany
+    {
+        return $this->belongsToMany(Section::class, 'post_section')
+            ->withTimestamps();
+    }
+
+    /** Many-to-Many: Pages */
+    public function pages(): BelongsToMany
+    {
+        return $this->belongsToMany(Page::class, 'post_page')
+            ->withTimestamps();
+    }
+
+    /** Many-to-Many: Blocks */
+    public function blocks(): BelongsToMany
+    {
+        return $this->belongsToMany(Block::class, 'post_block')
             ->withTimestamps();
     }
 
@@ -130,36 +150,6 @@ class Post extends Model
     public function parent()
     {
         return $this->belongsTo(Post::class, 'parent_id');
-    }
-
-    /**
-     * Get the sections associated with the post.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
-     */
-    public function sections()
-    {
-        return $this->belongsToMany(Section::class, 'post_section');
-    }
-
-    /**
-     * Get the pages associated with the post.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
-     */
-    public function pages()
-    {
-        return $this->belongsToMany(Page::class, 'post_page');
-    }
-
-    /**
-     * Get the blocks associated with the post.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
-     */
-    public function blocks()
-    {
-        return $this->belongsToMany(Block::class, 'post_block');
     }
 
     /**

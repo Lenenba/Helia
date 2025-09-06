@@ -5,11 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\Page;
 use App\Models\Post;
 use Inertia\Inertia;
-use App\Models\Block;
 use App\Models\Media;
-use App\Models\Section;
-use Illuminate\Support\Str;
+use Inertia\Response;
+use App\Services\PageService;
+use App\Http\Requests\PageRequest;
 use App\Services\ModelStatsService;
+use Illuminate\Http\RedirectResponse;
 
 class PageController extends Controller
 {
@@ -17,9 +18,9 @@ class PageController extends Controller
      * Display a listing of the resource.
      *
      * @param ModelStatsService $statsService
-     * @return \Inertia\Response
+     * @return Response
      */
-    public function index(ModelStatsService $statsService)
+    public function index(ModelStatsService $statsService): Response
     {
         $pages = Page::all();
         $stats = $statsService->compute($pages, 'type');
@@ -33,15 +34,13 @@ class PageController extends Controller
     /**
      * Show the form for creating a new resource.
      *
-     * @return \Inertia\Response
+     * @return Response
      */
-    public function create()
+    public function create(): Response
     {
-        // Configuration enrichie avec des 'mappers' pour une transformation sur mesure.
         $elementConfig = [
             'posts' => [
                 'model' => Post::class,
-                // Le mapper transforme chaque modèle Post en tableau avec la structure désirée.
                 'mapper' => function (Post $post) {
                     return [
                         'id' => $post->id,
@@ -57,14 +56,12 @@ class PageController extends Controller
             ],
             'medias' => [
                 'model' => Media::class,
-                // HYPOTHÈSE: Vous utilisez la librairie Spatie\MediaLibrary
-                // qui fournit des méthodes pratiques comme getUrl().
                 'mapper' => function (Media $media) {
                     return [
                         'id' => $media->id,
-                        'url' => $media->getUrl(), // Obtenir l'URL publique du média
-                        'title' => $media->file_name,   // Le nom donné au média
-                        'label' => $media->file_name,   // Le nom donné au média
+                        'url' => $media->getUrl(),
+                        'title' => $media->file_name,
+                        'label' => $media->file_name,
                         'mime' => $media->mime_type,
                         'type' => 'media',
                     ];
@@ -79,17 +76,31 @@ class PageController extends Controller
             $modelClass = $config['model'];
             $mapper = $config['mapper'];
 
-            // 1. On récupère les modèles complets, sans `select()`.
-            //    Ceci est nécessaire pour pouvoir utiliser les accesseurs
-            //    (ex: getUrl()) et avoir toutes les données dans le mapper.
             $items = $modelClass::query()->latest()->get();
 
-            // 2. On applique la transformation sur mesure définie dans le mapper.
             $availableElements[$key] = $items->map($mapper);
         }
 
         return Inertia::render('page/Create', [
             'availableElements' => $availableElements,
         ]);
+    }
+
+    /**
+     * Store a new page (thin controller).
+     *
+     * @param PageRequest $request
+     * @param PageService $pageService
+     *
+     * @return RedirectResponse
+     */
+    public function store(PageRequest $request, PageService $pageService): RedirectResponse
+    {
+        $validatedData = $request->validated();
+        $pageService->handle($validatedData, $request->user());
+
+        return redirect()
+            ->route('pages.list')
+            ->with('success', 'Page created successfully.');
     }
 }

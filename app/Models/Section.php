@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Section extends Model
 {
@@ -12,13 +13,11 @@ class Section extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'page_id',
         'title',
-        'slug',
         'is_published',
-        'order',
         'type',
         'color',
+        'slug',
         'settings',
     ];
 
@@ -28,24 +27,23 @@ class Section extends Model
         'settings' => 'array', // Pour stocker des paramètres flexibles sous forme de tableau
     ];
 
-    /**
-     * Get the page that owns the section.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
-     */
-    public function page()
+
+    /** Many-to-Many: Pages using this Section (ordered per page via pivot) */
+    public function pages(): BelongsToMany
     {
-        return $this->belongsTo(Page::class);
+        return $this->belongsToMany(Page::class, 'page_section')
+            ->withPivot(['order'])
+            ->withTimestamps()
+            ->orderBy('page_section.order');
     }
 
-    /**
-     * Get the blocks associated with the section.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\BelongsToMany
-     */
-    public function blocks()
+    /** Many-to-Many: Blocks inside this Section (ordered via pivot) */
+    public function blocks(): BelongsToMany
     {
-        return $this->belongsToMany(Block::class)->withPivot('order')->withTimestamps();
+        return $this->belongsToMany(Block::class, 'block_section')
+            ->withPivot(['order'])
+            ->withTimestamps()
+            ->orderBy('block_section.order');
     }
 
     /**

@@ -13,13 +13,9 @@ return new class extends Migration
     {
         Schema::create('blocks', function (Blueprint $table) {
             $table->id();
-            $table->string('type'); // e.g., 'text', 'image', etc.
-            $table->string('title')->nullable(); // Optionnel, pour certains blocs
-            $table->text('content'); // Main content
-            $table->json('settings')->nullable(); // Paramètres dynamiques
-            $table->boolean('is_published')->default(false);
-            $table->string('status')->default('draft'); // Pour des workflows plus avancés
-            $table->foreignId('media_id')->nullable()->constrained('media')->onDelete('set null');
+            $table->morphs('blockable');
+            $table->string('template_hint')->nullable(); // Pour aider le frontend
+            $table->json('settings')->nullable();
             $table->softDeletes();
             $table->timestamps();
         });
@@ -28,7 +24,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('block_id')->constrained()->onDelete('cascade');
             $table->foreignId('section_id')->constrained()->onDelete('cascade');
-            $table->unsignedInteger('order')->default(0); // Ordre dans la section
+            $table->unsignedInteger('order')->default(0);
             $table->timestamps();
         });
     }
@@ -38,7 +34,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('blocks');
         Schema::dropIfExists('block_section');
+        Schema::dropIfExists('blocks');
     }
 };

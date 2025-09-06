@@ -2,19 +2,38 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Casts\Attribute;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Block extends Model
 {
     /** @use HasFactory<\Database\Factories\BlockFactory> */
     use HasFactory, SoftDeletes;
 
+    protected $fillable = [
+        'type',
+        'title',
+        'content',
+        'settings',
+        'status',
+        'media_id',
+    ];
     // Attributs ajoutés à la réponse de l'API ou des données renvoyées
     protected $appends = ['created_at_human', 'updated_at_human'];
 
+    protected $casts = [
+        'is_published' => 'boolean',
+        'settings'     => 'array',
+    ];
+
+    /** Polymorphic target (HtmlContent, Post, Media, ...) */
+    public function blockable(): MorphTo
+    {
+        return $this->morphTo();
+    }
     /**
      * Format human-readable for the 'created_at' attribute.
      *
@@ -43,8 +62,9 @@ class Block extends Model
     public function sections()
     {
         return $this->belongsToMany(Section::class, 'block_section')
-            ->withPivot('order')  // Get the order from the pivot table
-            ->withTimestamps();
+            ->withTimestamps()
+            ->withPivot('order')
+            ->orderBy('block_section.order');
     }
 
     /**

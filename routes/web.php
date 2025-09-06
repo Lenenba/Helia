@@ -23,7 +23,7 @@ Route::middleware('auth')->group(
         // Pages management
         Route::get('pages', [PageController::class, 'index'])->name('pages.list');
         Route::get('pages/create', [PageController::class, 'create'])->name('pages.create');
-
+        Route::post('pages/store', [PageController::class, 'store'])->name('pages.store');
         // Posts management
         Route::get('posts', [PostController::class, 'index'])->name('posts.list');
         Route::get('posts/create', [PostController::class, 'create'])->name('posts.create');

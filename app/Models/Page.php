@@ -7,10 +7,24 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Page extends Model
 {
     use HasFactory, SoftDeletes;
+
+    protected $fillable = [
+        'title',
+        'slug',
+        'excerpt',
+        'is_published',
+        'type',
+        'status',
+        'published_at',
+        'settings',
+        'author_id',
+        'parent_id',
+    ];
 
     protected $appends = ['created_at_human', 'updated_at_human'];
 
@@ -89,16 +103,15 @@ class Page extends Model
         return $this->belongsTo(Page::class, 'parent_id');
     }
 
-    /**
-     * Get the sections associated with the page.
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
-     */
-    public function sections()
-    {
-        return $this->hasMany(Section::class);
-    }
 
+    /** Many-to-Many: Sections attached to this Page (ordered via pivot) */
+    public function sections(): BelongsToMany
+    {
+        return $this->belongsToMany(Section::class, 'page_section')
+            ->withPivot(['order'])
+            ->withTimestamps()
+            ->orderBy('page_section.order');
+    }
     /**
      * Get the blocks associated with the page via sections.
      *

@@ -3,9 +3,10 @@
 namespace Database\Factories;
 
 use App\Models\Block;
+use App\Models\HtmlContent;
+use App\Models\Post;
+use App\Models\Media;
 use App\Models\Section;
-use App\Helpers\ImageHelper;
-use App\Helpers\SequentialHelper;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -15,48 +16,60 @@ class BlockFactory extends Factory
 {
     /**
      * Define the model's default state.
+     * Par défaut, un bloc pointe vers un simple contenu HTML.
      *
      * @return array<string, mixed>
      */
     public function definition(): array
     {
-        $type = $this->faker->randomElement(['text', 'image', 'video', 'quote']);
-
-        $content = match ($type) {
-            'text'   => $this->faker->paragraphs(2, true),
-            'image'  => ImageHelper::fakeProfilePhoto() ?? ImageHelper::fakeCompanyLogo($this->faker),
-            'video'  => 'https://www.youtube.com/watch?v=' . $this->faker->regexify('[A-Za-z0-9_-]{11}'),
-            'quote'  => $this->faker->sentence(16),
-            default  => $this->faker->text(200),
-        };
-
         return [
-            'type'         => $type,
-            'content'      => $content,
-            'is_published' => $this->faker->boolean(),
-            'title'        => $this->faker->optional()->sentence(5),
-            'status'       => $this->faker->randomElement(['draft', 'published', 'archived']),
-            // 'settings'   => null, // Tu peux le décommenter et faker si besoin
-            // Pas d'order ni section_id ici !
+            // On crée un contenu HTML et on lie le bloc à celui-ci.
+            'blockable_id'   => HtmlContent::factory(),
+            'blockable_type' => HtmlContent::class,
+
+            'template_hint'  => $this->faker->randomElement(['default', 'card', 'highlight']),
+            'settings'       => null,
         ];
     }
 
     /**
-     * Associate the block with a section.
-     *
-     * @param Section|null $section
-     * @param int|null $order
-     * @return static
+     * Crée un bloc qui pointe vers un Post.
+     * Utilisation : Block::factory()->forPost()->create()
      */
-    public function withSection($section = null, $order = null)
+    public function forPost(Post $post): static
+    {
+        return $this->state(fn(array $attributes) => [
+            'blockable_id'   => $post ?? Post::factory(),
+            'blockable_type' => Post::class,
+        ]);
+    }
+
+    /**
+     * Crée un bloc qui pointe vers un Média (image).
+     * Utilisation : Block::factory()->forMedia()->create()
+     */
+    public function forMedia(Media $media): static
+    {
+        return $this->state(fn(array $attributes) => [
+            'blockable_id'   => $media ?? Media::factory(), // Assurez-vous d'avoir une MediaFactory
+            'blockable_type' => Media::class,
+            'template_hint'  => 'image',
+        ]);
+    }
+
+    /**
+     * Associe le bloc créé à une section dans la table pivot.
+     * Cette méthode reste très utile et sa logique est presque identique.
+     */
+    public function withSection(Section $section, int $order): static
     {
         return $this->afterCreating(function (Block $block) use ($section, $order) {
-            $section = $section ?: Section::factory()->create();
+            $targetSection = $section ?? Section::factory()->create();
 
-            // On calcule le prochain ordre si non fourni
-            $order = $order ?? ($section->blocks()->count() + 1);
+            // Calcule le prochain ordre si non fourni
+            $finalOrder = $order ?? $targetSection->blocks()->count();
 
-            $section->blocks()->attach($block->id, ['order' => $order]);
+            $targetSection->blocks()->attach($block->id, ['order' => $finalOrder]);
         });
     }
 }

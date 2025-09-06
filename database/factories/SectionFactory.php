@@ -23,21 +23,8 @@ class SectionFactory extends Factory
             'title' => $this->faker->sentence(),
             'is_published' => $this->faker->boolean(),
             'color' => $this->faker->hexColor(),
-            'order'        => 0, // Valeur temporaire, ajustée après création
             'slug' => $this->faker->slug(),
             'settings' => json_encode(['example_setting' => $this->faker->word()]),
-            'page_id' => Page::factory()
         ];
-    }
-
-    public function configure()
-    {
-        return $this->afterCreating(function (Section $section) {
-            // Ne met à jour que si order non renseigné
-            if (!$section->order || $section->order === 0) {
-                $section->order = SequentialHelper::nextOrderForPage($section->page_id);
-                $section->save();
-            }
-        });
     }
 }
