@@ -41,7 +41,7 @@ class Section extends Model
     public function blocks(): BelongsToMany
     {
         return $this->belongsToMany(Block::class, 'block_section')
-            ->withPivot(['order'])
+            ->withPivot(['order', 'column_index'])
             ->withTimestamps()
             ->orderBy('block_section.order');
     }

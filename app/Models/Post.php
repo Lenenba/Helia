@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
@@ -169,10 +170,38 @@ class Post extends Model
      */
     public function coverUrl(): Attribute
     {
-        $post_cover = Media::find($this->cover_media_id)->getUrl();
-        // Utilise la nouvelle syntaxe pour les accesseurs
-        return Attribute::get(
-            fn() => $post_cover
-        );
+        return Attribute::get(function () {
+            // 1) Si un cover_media_id est défini, on tente en priorité
+            if ($this->cover_media_id) {
+                $m = Media::find($this->cover_media_id);
+                if ($m) {
+                    // Spatie MediaLibrary -> Media::getUrl()
+                    if (method_exists($m, 'getUrl')) {
+                        return $m->getUrl();
+                    }
+                    // Media "maison" avec path/disk
+                    if (isset($m->path)) {
+                        return Storage::disk($m->disk ?? 'public')->url($m->path);
+                    }
+                    // Dernier recours: champ url direct
+                    return $m->url ?? null;
+                }
+            }
+
+            // 2) Sinon, on tente la relation morphOne coverImage()
+            $m = $this->relationLoaded('coverImage') ? $this->coverImage : $this->coverImage()->first();
+            if ($m) {
+                if (method_exists($m, 'getUrl')) {
+                    return $m->getUrl();
+                }
+                if (isset($m->path)) {
+                    return Storage::disk($m->disk ?? 'public')->url($m->path);
+                }
+                return $m->url ?? null;
+            }
+
+            // 3) Fallback éventuel (colonne legacy)
+            return $this->cover_image ?: null;
+        });
     }
 }

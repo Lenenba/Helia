@@ -2,12 +2,9 @@
 
 namespace Database\Factories;
 
-use App\Models\User;
 use App\Models\Media;
 use Illuminate\Support\Str;
-use App\Helpers\ImageHelper;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Http;
+use App\Support\Helpers\ImageHelper;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Database\Eloquent\Factories\Factory;
 

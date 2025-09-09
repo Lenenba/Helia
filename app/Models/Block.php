@@ -14,12 +14,10 @@ class Block extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
-        'type',
-        'title',
-        'content',
         'settings',
-        'status',
-        'media_id',
+        'blockable_id',
+        'blockable_type',
+        'template_hint',
     ];
     // Attributs ajoutés à la réponse de l'API ou des données renvoyées
     protected $appends = ['created_at_human', 'updated_at_human'];
@@ -63,7 +61,7 @@ class Block extends Model
     {
         return $this->belongsToMany(Section::class, 'block_section')
             ->withTimestamps()
-            ->withPivot('order')
+            ->withPivot(['order', 'column_index'])
             ->orderBy('block_section.order');
     }
 

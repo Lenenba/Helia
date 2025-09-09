@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Helpers;
+namespace App\Support\Helpers;
 
 use Faker\Generator as Faker;
 use Illuminate\Support\Facades\Log;

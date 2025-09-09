@@ -2,13 +2,17 @@
 
 namespace App\Http\Middleware;
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Http\Request;
 use Inertia\Middleware;
 use Tighten\Ziggy\Ziggy;
+use Illuminate\Http\Request;
+use App\Services\MenuService;
+use Illuminate\Foundation\Inspiring;
+use Illuminate\Support\Facades\Cache;
+use App\Http\Controllers\Traits\UtilsPhotoConverter;
 
 class HandleInertiaRequests extends Middleware
 {
+    use UtilsPhotoConverter;
     /**
      * The root template that's loaded on the first page visit.
      *
@@ -38,6 +42,12 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
+        $user = $request->user();
+        $cacheKey = 'menu_tree_main';
+        $menuTree = Cache::remember($cacheKey, now()->addMinutes(60), function () {
+            // This code runs only if the cache is empty.
+            return app(MenuService::class)->getPublicTree('main');
+        });
 
         return [
             ...parent::share($request),
@@ -45,10 +55,18 @@ class HandleInertiaRequests extends Middleware
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
                 'user' => $request->user(),
+                'profilPicture' =>  $this->convertToWebp($user?->media()->isProfilePicture()->first()->file_path ?? ''),
             ],
             'ziggy' => [
                 ...(new Ziggy)->toArray(),
                 'location' => $request->url(),
+            ],
+            'flash' => [
+                'success' => fn() => $request->session()->get('success'),
+                'error' => fn() => $request->session()->get('error')
+            ],
+            'menu' => [
+                'tree' => $menuTree,
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];

@@ -193,10 +193,7 @@ watch(selectedType, () => {
                     <div class="flex items-center justify-center rounded-md border border-dashed bg-muted/40 h-full">
                         <!-- Media preview only when type is medias and an URL exists -->
                         <div v-if="selectedType === 'medias' && mediaPreviewUrl" class="p-3 w-full h-full">
-                            <!--
-                Letterbox preview box that preserves aspect ratio and avoids overflow.
-                object-contain ensures the whole media is visible without distortion.
-              -->
+
                             <div
                                 class="w-full h-full rounded-md bg-background border overflow-hidden flex items-center justify-center">
                                 <img v-if="/\.(jpeg|jpg|gif|png|webp|bmp|svg)$/i.test(mediaPreviewUrl)"

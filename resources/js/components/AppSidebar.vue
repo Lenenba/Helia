@@ -5,7 +5,7 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid, Image, Notebook } from 'lucide-vue-next';
+import { SquareMenu, Folder, LayoutGrid, Image, Notebook } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
 const mainNavItems: NavItem[] = [
@@ -28,6 +28,11 @@ const mainNavItems: NavItem[] = [
         title: 'Content',
         href: '/posts',
         icon: Notebook,
+    },
+    {
+        title: 'Menus',
+        href: '/menus',
+        icon: SquareMenu,
     },
 ];
 

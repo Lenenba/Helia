@@ -18,6 +18,7 @@ defineProps<{
  * Elle utilise déjà les variables 'id' et 'type' passées en paramètres.
  */
 function action(id: string, type: string, event: string) {
+    console.log(`Action triggered: ${event} on ${type} with ID ${id}`);
     const eventType = event.toLowerCase();
 
     if (eventType === 'publish') {
@@ -37,6 +38,10 @@ function action(id: string, type: string, event: string) {
     } else if (eventType === 'edit') {
         if (type === 'post') {
             router.get(`/posts/${id}/edit`, {
+                preserveScroll: true
+            });
+        } else if (type === 'page') {
+            router.get(`/pages/${id}/edit`, {
                 preserveScroll: true
             });
         }

@@ -25,6 +25,7 @@ return new class extends Migration
             $table->foreignId('block_id')->constrained()->onDelete('cascade');
             $table->foreignId('section_id')->constrained()->onDelete('cascade');
             $table->unsignedInteger('order')->default(0);
+            $table->unsignedInteger('column_index')->default(0);
             $table->timestamps();
         });
     }

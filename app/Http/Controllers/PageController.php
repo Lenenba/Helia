@@ -3,17 +3,40 @@
 namespace App\Http\Controllers;
 
 use App\Models\Page;
-use App\Models\Post;
 use Inertia\Inertia;
-use App\Models\Media;
 use Inertia\Response;
 use App\Services\PageService;
+use App\Services\PageSyncService;
 use App\Http\Requests\PageRequest;
 use App\Services\ModelStatsService;
 use Illuminate\Http\RedirectResponse;
+use App\Http\Requests\PageUpdateRequest;
+use App\Support\Helpers\AvailableElements;
+use App\Support\Transformers\PageTransformer;
 
 class PageController extends Controller
 {
+
+    public function __construct(protected PageService $pages) {}
+    /**
+     * Display the specified resource.
+     *
+     * @param string|null $slug
+     * @return \Inertia\Response
+     */
+    public function show(?string $slug = null)
+    {
+
+        $payload = $slug
+            ? $this->pages->getRenderedBySlug($slug)
+            : ($this->pages->getRenderedBySlug('home')
+                ?? $this->pages->getRenderedHomeFallback());
+
+        if (! $payload) {
+            abort(404);
+        }
+        return Inertia::render('page/Show', $payload);
+    }
     /**
      * Display a listing of the resource.
      *
@@ -38,51 +61,13 @@ class PageController extends Controller
      */
     public function create(): Response
     {
-        $elementConfig = [
-            'posts' => [
-                'model' => Post::class,
-                'mapper' => function (Post $post) {
-                    return [
-                        'id' => $post->id,
-                        'title' => $post->title,
-                        'label' => $post->title,
-                        'excerpt' => $post->excerpt,
-                        'body' => $post->content,
-                        'cover_url' => $post->coverUrl,
-                        'image_position' => $post->image_position ?? 'left',
-                        'type' => 'post',
-                    ];
-                }
-            ],
-            'medias' => [
-                'model' => Media::class,
-                'mapper' => function (Media $media) {
-                    return [
-                        'id' => $media->id,
-                        'url' => $media->getUrl(),
-                        'title' => $media->file_name,
-                        'label' => $media->file_name,
-                        'mime' => $media->mime_type,
-                        'type' => 'media',
-                    ];
-                }
-            ],
-        ];
-
-        $availableElements = [];
-
-        // La boucle est maintenant plus simple et plus puissante.
-        foreach ($elementConfig as $key => $config) {
-            $modelClass = $config['model'];
-            $mapper = $config['mapper'];
-
-            $items = $modelClass::query()->latest()->get();
-
-            $availableElements[$key] = $items->map($mapper);
-        }
 
         return Inertia::render('page/Create', [
-            'availableElements' => $availableElements,
+            'availableElements' => AvailableElements::fetch(
+                include: ['posts', 'blocks', 'medias', 'pages'], // ce dont la vue a besoin
+                limit: 200,
+                cacheTtl: 300
+            ),
         ]);
     }
 
@@ -97,10 +82,54 @@ class PageController extends Controller
     public function store(PageRequest $request, PageService $pageService): RedirectResponse
     {
         $validatedData = $request->validated();
-        $pageService->handle($validatedData, $request->user());
+        $pageService->create($validatedData, $request->user());
 
         return redirect()
             ->route('pages.list')
             ->with('success', 'Page created successfully.');
+    }
+
+    /**
+     * Show the form for editing the specified resource.
+     *
+     * @param Page $page
+     * @return Response
+     */
+    public function edit(Page $page): Response
+    {
+        $page->load(['sections' => function ($q) {
+            $q->orderBy('order')
+                ->with('blocks'); // si vous avez une relation blocks liée à section/column
+        }]);
+
+        $dto = app(PageTransformer::class)->toDto($page);
+
+        return Inertia::render('page/Edit', [
+            'page'              => $dto,
+            'availableElements' => AvailableElements::fetch(
+                include: ['posts', 'blocks', 'medias', 'pages', 'sections'],
+                limit: 200,
+                cacheTtl: 300
+            ),
+        ]);
+    }
+
+    /**
+     * Update the specified resource in storage.
+     *
+     * @param \App\Http\Requests\PageUpdateRequest $request
+     * @param Page $page
+     * @return RedirectResponse
+     */
+    public function update(PageUpdateRequest $request, Page $page, PageService $service): RedirectResponse
+    {
+        $validated = $request->validated();
+        $pruneOrphans = (bool) $request->boolean('prune_orphans', false);
+
+        $service->update($page, $validated, $pruneOrphans);
+
+        return redirect()
+            ->route('pages.list')
+            ->with('success', 'Page updated successfully.');
     }
 }

@@ -14,7 +14,9 @@ return new class extends Migration
         Schema::create('sections', function (Blueprint $table) {
             $table->id();
             $table->string('title')->nullable();
-            $table->boolean('is_published')->default(false); // Peut être gardé pour un contrôle global
+            $table->unsignedInteger('order')->default(0);
+            $table->string('db_type')->nullable();
+            $table->boolean('is_published')->default(false);
             $table->enum('type', ['one_column', 'two_columns', 'tree_columns', 'for_columns', 'hero', 'gallery'])
                 ->default('one_column');
             $table->string('color')->default('#ffffff');

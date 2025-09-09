@@ -192,11 +192,12 @@ function truncate(text = '', max = 160): string {
                 <p v-if="payload.excerpt" class="text-sm text-muted-foreground mt-1">
                     {{ truncate(payload.excerpt, 240) }}
                 </p>
-                <div v-if="props.allowHtml && payload.bodyHtml" class="prose prose-sm max-w-none mt-3"
-                    v-html="payload.bodyHtml" />
+                <div v-if="props.allowHtml && (payload as any).html" class="prose prose-sm max-w-none mt-3"
+                    v-html="(payload as any).html" />
             </div>
         </template>
 
+        <!-- GENERIC FALLBACK -->
         <!-- GENERIC FALLBACK -->
         <template v-else>
             <div class="bg-muted/40 border-b flex items-center justify-center text-xs text-muted-foreground"
@@ -205,9 +206,12 @@ function truncate(text = '', max = 160): string {
             </div>
             <div class="p-4">
                 <h3 class="text-base font-semibold leading-tight">{{ (payload as any).title || 'Untitled' }}</h3>
-                <p class="text-sm text-muted-foreground mt-1">
-                    {{ (payload as any).excerpt || 'No description' }}
+                <p v-if="(payload as any).excerpt" class="text-sm text-muted-foreground mt-1">
+                    {{ (payload as any).excerpt }}
                 </p>
+                <!-- ✅ nouveau : rendu du HTML des blocs génériques -->
+                <div v-if="props.allowHtml && (payload as any).html" class="prose prose-sm max-w-none mt-3"
+                    v-html="(payload as any).html" />
             </div>
         </template>
     </div>

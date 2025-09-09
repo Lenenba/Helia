@@ -6,7 +6,7 @@ use App\Models\Tag;
 use App\Models\Post;
 use App\Models\User;
 use Illuminate\Support\Arr;
-use App\Helpers\ImageHelper;
+use App\Support\Helpers\ImageHelper;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
