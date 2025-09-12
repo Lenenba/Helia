@@ -21,7 +21,7 @@ class MenuRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['required', 'string', 'max:255', 'unique:menus,slug,' . $this->menu->id],
-            'settings' => ['nullable', 'json'],
+            'settings' => ['nullable'],
             'tree' => ['nullable', 'array'],
             'tree.*.id' => ['required'],
             'tree.*.label' => ['required', 'string'],

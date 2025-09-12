@@ -15,15 +15,12 @@ use App\Http\Controllers\SetAsProfilePhotoController;
 use App\Http\Controllers\DeleteProfilePhotoController;
 
 // Home by slug "home" (or root "/")
-Route::get('/', [PageController::class, 'show'])->name('home');
+Route::get('/', [PageController::class, 'home'])->name('home');
+Route::get('/pages/{slug}', [PageController::class, 'showBySlug'])->name('pages.show');
 
 Route::get('dashboard', function () {
     return Inertia::render('Dashboard');
 })->middleware(['auth', 'verified'])->name('dashboard');
-
-Route::get('/pages/{page:slug}', [PageController::class, 'show'])->name('pages.show');
-
-
 
 Route::middleware('auth')->group(
     function () {

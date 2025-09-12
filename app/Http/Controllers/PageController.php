@@ -17,26 +17,28 @@ use App\Support\Transformers\PageTransformer;
 class PageController extends Controller
 {
 
-    public function __construct(protected PageService $pages) {}
-    /**
-     * Display the specified resource.
-     *
-     * @param string|null $slug
-     * @return \Inertia\Response
-     */
-    public function show(?string $slug = null)
+    public function __construct(
+        protected PageService $pages
+    ) {}
+
+    /** Home = slug 'home' si présent, sinon 1re page créée (published si possible) */
+    public function home(): Response
     {
+        $dto = $this->pages->getRenderedHomeBySlugFallback(); // << nouveau (voir service)
+        abort_if(!$dto, 404);
 
-        $payload = $slug
-            ? $this->pages->getRenderedBySlug($slug)
-            : ($this->pages->getRenderedBySlug('home')
-                ?? $this->pages->getRenderedHomeFallback());
-
-        if (! $payload) {
-            abort(404);
-        }
-        return Inertia::render('page/Show', $payload);
+        return Inertia::render('page/Show', $dto);
     }
+
+    /** Affiche une page par slug */
+    public function showBySlug(string $slug): Response
+    {
+        $dto = $this->pages->getRenderedBySlug($slug);
+        abort_if(!$dto, 404);
+
+        return Inertia::render('page/Show', $dto);
+    }
+
     /**
      * Display a listing of the resource.
      *

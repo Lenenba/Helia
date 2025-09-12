@@ -1,53 +1,99 @@
 <script setup lang="ts">
-import SiteLayout from '@layouts/SiteLayout.vue'
+import SiteLayout from '@/Layouts/SiteLayout.vue'
 import { Head } from '@inertiajs/vue3'
 import { computed } from 'vue'
+import BlockRenderer from '@/components/blocks/BlockRenderer.vue'
 
-// Props from PageTransformer::toInertia()
+type AnyRec = Record<string, any>
+
 const props = defineProps<{
-    page: { id: number; title: string; slug: string; excerpt?: string | null; seo?: any; layout?: string };
-    sections: Array<{
-        id: number; title?: string | null; key?: string | null; settings?: Record<string, any>;
-        blocks: Array<{
-            id: number; type: string; weight: number; settings?: Record<string, any>; data?: Record<string, any>;
-        }>;
-    }>;
+    page?: AnyRec
+    sections?: AnyRec[]
 }>()
 
-// Simple block registry. Register new block types here.
-const registry: Record<string, any> = {
-    'rich_text': defineAsyncComponent(() => import('@/components/blocks/RichTextBlock.vue')),
-    'image': defineAsyncComponent(() => import('@/components/blocks/ImageBlock.vue')),
-    'post_teaser': defineAsyncComponent(() => import('@/components/blocks/PostTeaserBlock.vue')),
+const view = computed(() => {
+    if (props.page && Array.isArray(props.sections)) {
+        return { title: String(props.page?.title ?? ''), sections: props.sections, shape: 'inertia' as const }
+    }
+    if (props.page && Array.isArray(props.page.sections)) {
+        return { title: String(props.page?.title ?? ''), sections: props.page.sections, shape: 'dto' as const }
+    }
+    return { title: 'Untitled', sections: [], shape: 'unknown' as const }
+})
+
+function readColumnsCount(section: AnyRec): number {
+    const fromLayout = Number(section?.layout?.columns_count)
+    if (Number.isInteger(fromLayout) && fromLayout > 0) return Math.min(fromLayout, 4)
+    const sCnt = Number(section?.settings?.columns_count)
+    if (Number.isInteger(sCnt) && sCnt > 0) return Math.min(sCnt, 4)
+    return 1
 }
 
-function cmpFor(type: string) {
-    return registry[type] ?? defineAsyncComponent(() => import('@/components/blocks/UnknownBlock.vue'))
+function getColumns(section: AnyRec): Array<{ blocks: AnyRec[] }> {
+    if (Array.isArray(section?.layout?.columns)) {
+        return section.layout.columns.map((c: AnyRec) => ({
+            blocks: Array.isArray(c?.blocks) ? c.blocks : []
+        }))
+    }
+    const blocks = Array.isArray(section?.blocks) ? section.blocks : []
+    const cols = readColumnsCount(section)
+    if (cols <= 1) return [{ blocks }]
+    const buckets = Array.from({ length: cols }, () => ({ blocks: [] as AnyRec[] }))
+    blocks.forEach((b: AnyRec, i: number) => { buckets[i % cols].blocks.push(b) })
+    return buckets
 }
 
-const title = computed(() => props.page?.seo?.title ?? props.page?.title ?? 'Page')
-const description = computed(() => props.page?.seo?.description ?? props.page?.excerpt ?? '')
-const image = computed(() => props.page?.seo?.image ?? null)
+function gridClass(section: AnyRec): string {
+    const c = readColumnsCount(section)
+    if (c === 4) return 'grid grid-cols-1 md:grid-cols-4 gap-6'
+    if (c === 3) return 'grid grid-cols-1 md:grid-cols-3 gap-6'
+    if (c === 2) return 'grid grid-cols-1 md:grid-cols-2 gap-6'
+    return 'grid grid-cols-1 gap-6'
+}
+
+function resolveType(block: AnyRec): string {
+    if (typeof block?.type === 'string') return block.type
+    if (typeof block?.contentType === 'string') return block.contentType
+    return 'block'
+}
+
+function resolveBlockDisplay(block: AnyRec) {
+    const type = resolveType(block)
+    if (block?.settings || block?.data) {
+        if (type === 'image') {
+            return { kind: 'image', url: block?.data?.url ?? block?.settings?.url, alt: block?.data?.alt ?? block?.settings?.alt ?? '' }
+        }
+        if (type === 'post_teaser') {
+            return { kind: 'post', title: block?.data?.title ?? '', excerpt: block?.data?.excerpt ?? '', cover: block?.data?.cover ?? null, href: block?.data?.href ?? '#' }
+        }
+        if (type === 'rich_text') {
+            return { kind: 'html', html: block?.settings?.html ?? block?.data?.html ?? '' }
+        }
+        return { kind: 'generic', payload: { type, ...block } }
+    }
+    if (block?.contentType === 'media') return { kind: 'media', id: block?.contentId, title: block?.title ?? '' }
+    if (block?.contentType === 'post') return { kind: 'post_ref', id: block?.contentId, title: block?.title ?? '' }
+    return { kind: 'generic', payload: block }
+}
 </script>
 
 <template>
     <SiteLayout>
 
-        <Head :title="title">
-            <meta v-if="description" name="description" :content="description" />
-            <meta v-if="image" property="og:image" :content="image" />
-        </Head>
-
-        <!-- Example: layout-aware wrapper -->
-        <div class="mx-auto max-w-6xl px-4 py-8">
-            <h1 class="mb-6 text-2xl font-semibold">{{ page.title }}</h1>
-
-            <section v-for="section in sections" :key="section.id" class="mb-10">
-                <h2 v-if="section.title" class="mb-4 text-lg font-medium">{{ section.title }}</h2>
-
-                <div class="grid gap-6 md:grid-cols-12">
-                    <component v-for="blk in section.blocks" :key="blk.id" :is="cmpFor(blk.type)"
-                        :settings="blk.settings" :data="blk.data" class="md:col-span-12" />
+        <Head :title="view.title" />
+        <div class="mx-auto max-w-6xl px-4 py-10">
+            <h1 class="text-2xl font-semibold mb-6">{{ view.title }}</h1>
+            <section v-for="(s, sIdx) in view.sections" :key="s.id ?? sIdx" class="mb-10">
+                <div v-if="s.title" class="mb-4">
+                    <h2 class="text-lg font-semibold">{{ s.title }}</h2>
+                </div>
+                <div :class="gridClass(s)">
+                    <div v-for="(col, cIdx) in getColumns(s)" :key="cIdx" class="space-y-4">
+                        <article v-for="(b, bIdx) in col.blocks" :key="b.id ?? bIdx"
+                            class="rounded-lg border bg-card text-card-foreground overflow-hidden h-full">
+                            <BlockRenderer :block="b" :display="resolveBlockDisplay(b)" />
+                        </article>
+                    </div>
                 </div>
             </section>
         </div>

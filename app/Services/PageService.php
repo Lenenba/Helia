@@ -13,6 +13,7 @@ use App\Services\Support\UniqueSlugService;
 use App\Support\Transformers\PageTransformer;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * PageService
@@ -32,6 +33,22 @@ class PageService
         protected UniqueSlugService $slugger,
         protected PageTransformer $transformer
     ) {}
+
+    /** Find the Page flagged as home, with sections/blocks eager loaded. */
+    public function findHome(): Page
+    {
+        return Page::where('is_home', true)
+            ->with(['sections.blocks'])
+            ->firstOrFail();
+    }
+
+    /** Find a Page by slug, with sections/blocks eager loaded. */
+    public function findBySlugWithTree(string $slug): Page
+    {
+        return Page::where('slug', $slug)
+            ->with(['sections.blocks'])
+            ->firstOrFail();
+    }
 
     /** Create a new Page and fully sync its sections/blocks. */
     public function create(array $payload, ?Authenticatable $author = null): Page
@@ -290,8 +307,8 @@ class PageService
                 ->with([
                     // Assuming relations exist:
                     // sections (ordered), blocks (ordered), blockable morphs, media, etc.
-                    'sections' => fn($q) => $q->orderBy('weight'),
-                    'sections.blocks' => fn($q) => $q->orderBy('weight'),
+                    'sections' => fn($q) => $q->orderBy('order'),
+                    'sections.blocks' => fn($q) => $q->orderBy('order'),
                     'sections.blocks.blockable', // morphTo
                 ])
                 ->first();
@@ -311,8 +328,8 @@ class PageService
             ->where(fn($q) => $q->where('slug', 'home'))
             ->where('is_published', true)
             ->with([
-                'sections' => fn($q) => $q->orderBy('weight'),
-                'sections.blocks' => fn($q) => $q->orderBy('weight'),
+                'sections' => fn($q) => $q->orderBy('order'),
+                'sections.blocks' => fn($q) => $q->orderBy('order'),
                 'sections.blocks.blockable',
             ])
             ->first();
@@ -324,5 +341,51 @@ class PageService
     public static function bustCacheFor(Page $page): void
     {
         Cache::forget("page_rendered:{$page->slug}");
+    }
+
+
+    public function getRenderedHomeBySlugFallback(): ?array
+    {
+        // 1) Essayer la page 'home' publiée
+        $page = Cache::remember('page_rendered:home', now()->addMinutes(30), function () {
+            return \App\Models\Page::query()
+                ->where('slug', 'home')
+                ->when(schema::hasColumn('pages', 'is_published'), fn($q) => $q->where('is_published', true))
+                ->with([
+                    'sections' => fn($q) => $q->orderBy('order'),
+                    'sections.blocks' => fn($q) => $q->orderBy('order'),
+                    'sections.blocks.blockable',
+                ])
+                ->first();
+        });
+
+        if ($page) {
+            return $this->transformer->toInertia($page);
+        }
+
+        // 2) Fallback: 1re page **publiée** par created_at (si colonne dispo), sinon 1re page tout court
+        $fallback = Page::query()
+            ->when(schema::hasColumn('pages', 'is_published'), fn($q) => $q->where('is_published', true))
+            ->when(schema::hasColumn('pages', 'created_at'), fn($q) => $q->orderBy('created_at', 'asc'))
+            ->with([
+                'sections' => fn($q) => $q->orderBy('order'),
+                'sections.blocks' => fn($q) => $q->orderBy('order'),
+                'sections.blocks.blockable',
+            ])
+            ->first();
+
+        // Si aucune publiée et qu’on a trié par created_at, reprendre vraiment la toute 1re
+        if (!$fallback) {
+            $fallback = Page::query()
+                ->when(schema::hasColumn('pages', 'created_at'), fn($q) => $q->orderBy('created_at', 'asc'))
+                ->with([
+                    'sections' => fn($q) => $q->orderBy('order'),
+                    'sections.blocks' => fn($q) => $q->orderBy('order'),
+                    'sections.blocks.blockable',
+                ])
+                ->first();
+        }
+
+        return $fallback ? $this->transformer->toInertia($fallback) : null;
     }
 }
